@@ -23,6 +23,7 @@ import time
 class CrawlAct:
     test_url = "https://www.quora.com/profile/Gwen-Thurston/activity"
     chromedriver_path = "/home/berryberry/installDependencies/chromedriver"
+
     def start_crawl(self):
         chrome_options = Options()
         prefs = {"profile.managed_default_content_settings.images": 2}
@@ -61,7 +62,7 @@ class CrawlAct:
         for div in acts_div:
             activitiy = div.find_elements_by_class_name("EventHeader pass_color_to_child_links many_faces")
             print(activitiy)
-
+            
 
     def time_judge(self, final_time):
         # month_list = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -72,6 +73,49 @@ class CrawlAct:
             return False
         else:
             return True
+
+
+class ActivityItems(object):
+
+
+    UpvotedItem = {
+        '_id': '',
+        'question_link': '',
+        'answer': '',
+        'answer_user': '',
+        'upvoted_time': '',
+        'crawled_time': ''
+    }
+
+    WriterItem = {
+        '_id': '',
+        'question_link': '',
+        'write_answer': '',
+        'write_time': '',
+        'crawled_time': ''
+    }
+
+    AskedItem = {
+        '_id': '',
+        'asked_question_linke': '',
+        'asked_time': '',
+        'crawled_time': ''
+    }
+
+    FollowedTopicItem = {
+        '_id': '',
+        'topic_link': '',
+        'followed_time': '',
+        'crawled_time': ''
+    }
+
+    FollowedUserItem = {
+        '_id': '',
+        'user_id': '',
+        'followed_time': '',
+        'crawled_time': ''
+    }
+    
 
 if __name__ == "__main__":
     act = CrawlAct()
