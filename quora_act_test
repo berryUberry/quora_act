@@ -1,0 +1,78 @@
+# encoding: utf-8 
+""" 
+@author: wangkai 
+@contact: berryberryry@gmail.com
+@version: 1.0 
+@license: Apache Licence 
+@file: quora_act_test.py 
+@time: 18-9-19 下午7:53 
+
+这一行开始写关于本文件的说明与解释 
+"""
+
+import pymongo
+import re
+from selenium import webdriver
+from bs4 import BeautifulSoup
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.keys import Keys
+# from pyvirtualdisplay import Display
+import time
+
+
+class CrawlAct:
+    test_url = "https://www.quora.com/profile/Gwen-Thurston/activity"
+    chromedriver_path = "/home/berryberry/installDependencies/chromedriver"
+    def start_crawl(self):
+        chrome_options = Options()
+        prefs = {"profile.managed_default_content_settings.images": 2}
+        chrome_options.add_experimental_option("prefs", prefs)
+        chrome_options.add_argument('--disable-gpu')
+        chrome_options.add_argument('--no-sandbox')
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument('--headless')
+        browser = webdriver.Chrome(executable_path=self.chromedriver_path, chrome_options=chrome_options)
+
+        browser.get(self.test_url)
+
+        # try:
+        #     time_span = browser.find_elements_by_class_name("timestamp")[-1]
+        #     final_time = time_span.text
+        #
+        # except:
+        #     final_time = ""
+        #     print("error1")
+        # # 加载所有动态
+        # try_num = 0
+        # while self.time_judge(final_time):
+        #     browser.execute_script("window.scrollTo(0, document.body.scrollHeight * 20)")
+        #     print("next_page")
+        #     try:
+        #         time_span = browser.find_elements_by_class_name("timestamp")[-1]
+        #         final_time = time_span.text
+        #     except:
+        #         print("error")
+        #     try_num += 1
+        #     if try_num > 20:
+        #         break
+        # print("finish")
+        print(browser.page_source)
+        acts_div = browser.find_elements_by_class_name("pagedlist_item")
+        for div in acts_div:
+            activitiy = div.find_elements_by_class_name("EventHeader pass_color_to_child_links many_faces")
+            print(activitiy)
+
+
+    def time_judge(self, final_time):
+        # month_list = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        #               'Jul', 'Aug', 'Sep', 'Oct']
+        # month_stop = ['Nov', 'Dec']  # 这个结束时间需要再确定一下
+
+        if re.match("(Nov)|(Dec)", final_time):
+            return False
+        else:
+            return True
+
+if __name__ == "__main__":
+    act = CrawlAct()
+    act.start_crawl()
