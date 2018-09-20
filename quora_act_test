@@ -15,6 +15,7 @@ import re
 from selenium import webdriver
 from bs4 import BeautifulSoup
 from selenium.webdriver.chrome.options import Options
+import datetime
 from selenium.webdriver.common.keys import Keys
 # from pyvirtualdisplay import Display
 import time
@@ -31,53 +32,186 @@ class CrawlAct:
         chrome_options.add_argument('--disable-gpu')
         chrome_options.add_argument('--no-sandbox')
         chrome_options.add_argument("--disable-dev-shm-usage")
-        chrome_options.add_argument('--headless')
+        # chrome_options.add_argument('--headless')
         browser = webdriver.Chrome(executable_path=self.chromedriver_path, chrome_options=chrome_options)
 
         browser.get(self.test_url)
+        browser.implicitly_wait(3)
+        act_nums = 0
+        try:
+            time_span = browser.find_elements_by_class_name("timestamp")[-1]
+            acts_div = browser.find_elements_by_class_name("pagedlist_item")
+            act_nums = len(acts_div)
+            final_time = time_span.text
 
-        # try:
-        #     time_span = browser.find_elements_by_class_name("timestamp")[-1]
-        #     final_time = time_span.text
-        #
-        # except:
-        #     final_time = ""
-        #     print("error1")
-        # # 加载所有动态
-        # try_num = 0
-        # while self.time_judge(final_time):
-        #     browser.execute_script("window.scrollTo(0, document.body.scrollHeight * 20)")
-        #     print("next_page")
-        #     try:
-        #         time_span = browser.find_elements_by_class_name("timestamp")[-1]
-        #         final_time = time_span.text
-        #     except:
-        #         print("error")
-        #     try_num += 1
-        #     if try_num > 20:
-        #         break
-        # print("finish")
-        print(browser.page_source)
-        acts_div = browser.find_elements_by_class_name("pagedlist_item")
-        for div in acts_div:
-            activitiy = div.find_elements_by_class_name("EventHeader pass_color_to_child_links many_faces")
-            print(activitiy)
-            
+        except:
+            final_time = ""
+            print("error1")
+        # 加载所有动态
+        try_num = 0
+        while self.time_judge(final_time):
+            browser.execute_script("window.scrollTo(0, document.body.scrollHeight * 20)")
+            time.sleep(1)
+            print("next_page")
+            try:
+                time_span = browser.find_elements_by_class_name("timestamp")[-1]
+                acts_div = browser.find_elements_by_class_name("pagedlist_item")
+                if act_nums == len(acts_div):
+                    try_num += 1
+                else:
+                    act_nums = len(acts_div)
+                    try_num = 0
+                final_time = time_span.text
+                print(final_time)
+            except:
+                print("error")
+                try_num += 1
+            break
+            if try_num > 7:
+                break
+        print("finish")
+        # print(browser.page_source)
+
+        activity_html_source = browser.page_source
+        activity_soup = BeautifulSoup(activity_html_source, 'lxml')
+        activity_list = activity_soup.find_all(attrs={"class": "pagedlist_item"})
+        for div in activity_list:
+            activity = div.find(attrs={"class": "EventHeader pass_color_to_child_links many_faces"})
+            print(activity.get_text())
+            self.judge_type(activity.get_text(), div)
+
+        # acts_div = browser.find_elements_by_class_name("pagedlist_item")
+        # for div in acts_div:
+        #     activitiy = div.find_elements_by_xpath("//div[@class='EventHeader pass_color_to_child_links many_faces']")
+        #     print(len(activitiy))
 
     def time_judge(self, final_time):
         # month_list = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
         #               'Jul', 'Aug', 'Sep', 'Oct']
         # month_stop = ['Nov', 'Dec']  # 这个结束时间需要再确定一下
-
-        if re.match("(Nov)|(Dec)", final_time):
+        if re.search("(Nov)|(Dec)", final_time):
             return False
         else:
             return True
 
+    def insert_to_mongodb(self, Item):
+        mongo_uri = '183.174.228.25:38018'
+        mongodb = 'Quora'
+        # mongo_uri = 'localhost:27017'
+        # mongodb = 'QuoraNew'
+        collection_name = 'quoraData'
+
+        client = pymongo.MongoClient(mongo_uri)
+        db = client[mongodb]
+
+        db[collection_name].update({'_id': Item['_id']}, {'$set': dict(Item)}, True)
+        print('insert' + Item['_id'])
+        client.close()
+
+    def judge_type(self, activity_text, activity):
+        if re.search("upvoted", activity_text):
+            print("upvoted")
+            try:
+                question_link = activity.find(attrs={"class": "question_link"}).get('href')
+            except:
+                question_link = ''
+            try:
+                answer = activity.find(attrs={"class": "ui_qtext_truncated ui_qtext_truncated_compact"}).get_text()
+            except:
+                answer = ''
+            try:
+                answer_user_id = activity.find(attrs={"class": "Answer"}).find(
+                    attrs={"class": "user"}).get('href')
+            except:
+                answer_user_id = ''
+            try:
+                upvoted_time = activity.find(attrs={"class": "timestamp"}).get_text()
+            except:
+                upvoted_time = ''
+
+            upvoted_dict = {}
+            upvoted_dict['_id'] = 'TODO'
+            upvoted_dict['question_link'] = question_link
+            upvoted_dict['answer'] = answer
+            upvoted_dict['answer_user_id'] = answer_user_id
+            upvoted_dict['upvoted_time'] = upvoted_time
+            upvoted_dict['crawled_time'] = datetime.datetime.now().strftime('%Y-%m-%d')
+            for key, value in upvoted_dict.items():
+                print(key, ': ', value)
+
+        elif re.search("wrote", activity_text):
+            print("wrote")
+
+            try:
+                question_link = activity.find(attrs={"class": "question_link"}).get('href')
+            except:
+                question_link = ''
+
+            try:
+                write_answer = activity.find(
+                    attrs={"class": "ui_qtext_truncated ui_qtext_truncated_compact"}).get_text()
+            except:
+                write_answer = ''
+
+            try:
+                write_time = activity.find(attrs={"class": "timestamp"}).get_text()
+            except:
+                write_time = ''
+
+            wrote_dict = {}
+            wrote_dict['_id'] = 'TODO'
+            wrote_dict['question_link'] = question_link
+            wrote_dict['write_answer'] = write_answer
+            wrote_dict['writer_time'] = write_time
+            wrote_dict['crawled_time'] = datetime.datetime.now().strftime('%Y-%m-%d')
+            for key, value in wrote_dict.items():
+                print(key, ': ', value)
+
+        elif re.search("asked", activity_text):
+            print("asked")
+
+        elif re.search("followed", activity_text):
+            print("followed")
+            try:
+                if activity.find(attrs={"class": "object_follow_story"}).find(
+                        attrs={"class": "HoverMenu TopicNameLink topic_name"}).get('href'):
+                    topic_link = activity.find(attrs={"class": "object_follow_story"}).find(
+                        attrs={"class": "HoverMenu TopicNameLink topic_name"}).get('href')
+                    try:
+                        followed_time = activity.find(attrs={"class": "timestamp"}).get_text()
+                    except:
+                        followed_time = ''
+                    followed_topic_list = {}
+                    followed_topic_list['_id'] = 'TODO'
+                    followed_topic_list['topic_link'] = topic_link
+                    followed_topic_list['follow_time'] = followed_time
+                    followed_topic_list['crawled_time'] = datetime.datetime.now().strftime('%Y-%m-%d')
+                    for key, value in followed_topic_list.items():
+                        print(key, ': ', value)
+
+                    return followed_topic_list
+                if activity.find(attrs={"class": "object_follow_story"}).activity.find(attrs={"class": "user"}).get(
+                        'href'):
+                    followed_user_id = activity.find(attrs={"class": "object_follow_story"}).activity.find(
+                        attrs={"class": "user"}).get('href')
+                    try:
+                        followed_time = activity.find(attrs={"class": "timestamp"}).get_text()
+                    except:
+                        followed_time = ''
+                    followed_user_list = {}
+                    followed_user_list['_id'] = 'TODO'
+                    followed_user_list['followed_user_id'] = followed_user_id
+                    followed_user_list['follow_time'] = followed_time
+                    followed_user_list['crawled_time'] = datetime.datetime.now().strftime('%Y-%m-%d')
+                    for key, value in followed_user_list.items():
+                        print(key, ': ', value)
+
+                    return followed_user_list
+            except:
+                return None
+
 
 class ActivityItems(object):
-
-
     UpvotedItem = {
         '_id': '',
         'question_link': '',
@@ -87,7 +221,7 @@ class ActivityItems(object):
         'crawled_time': ''
     }
 
-    WriterItem = {
+    WroteItem = {
         '_id': '',
         'question_link': '',
         'write_answer': '',
@@ -115,7 +249,7 @@ class ActivityItems(object):
         'followed_time': '',
         'crawled_time': ''
     }
-    
+
 
 if __name__ == "__main__":
     act = CrawlAct()
